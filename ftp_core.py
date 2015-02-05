@@ -6,8 +6,14 @@ class CommandConnection:
     def __init__(self, serv_address, port=21):
         self.serv_address = serv_address
         self.port = port
+        self.command_socket = socket.socket()
+
     def make_connection(self):
-        pass
+        self.command_socket.connect((self.serv_address, self.port))
+        self.reply = self.command_socket.recv(1024)
+
+    def parse_reply(self):
+        return (self.reply[:3], self.reply[4:])
 
     def send_cmd(self, cmd):
         pass
