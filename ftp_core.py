@@ -21,7 +21,7 @@ class FTPCore:
         def __init__(self, serv_address, port, data_con_type):
             self.serv_address = serv_address
             self.port = port
-            self.data_con_type = data_con_type # Активное или пассивное соединение
+            self.data_con_type = data_con_type
             self.encoding = "UTF-8"
             self.connection_established = False
             self.command_socket = socket.socket()
@@ -32,14 +32,8 @@ class FTPCore:
                 self.command_socket.connect((self.serv_address, self.port))
             except (socket.error, OSError) as err:
                 print("Извините, не удаётся установить соединение.")
-                # твоя задача - вывести минимальный трейсбек с номером ошибки и сообщением
-                # в виде
-                #    Ошибка: Connection timed out. Код ответа: 110.
-                #    Ошибка: Transport endpoint is not connected. Код ответа: 107.
-                # у сокета есть параметр - время ожидания. Его нужно задать небольшим чтобы не ждать ответов сервера по пол минуты
                 print(traceback.format_exception_only(type(err), err)[0])
                 self.command_socket.close()
-                # Сокет как и файл в случае ошибок нужно закрывать.
                 return False
             code, message = self.get_reply()
             if code == 220:
@@ -83,13 +77,16 @@ class FTPCore:
                 pass
 
         def close_connection(self):
-            pass
+            self.data_sock.close()
 
         def send_data(self):
             pass
 
-        def get_data(self):
-            pass
+        def get_data(self, current_number_of_bytes, number_of_bytes):
+            while current_number_of_bytes < number_of_bytes:
+                data = self.data_sock.recv(1024)
+                yield data
+                current_number_of_bytes += 1024
 
     class Commands:
         """
@@ -147,7 +144,7 @@ class FTPCore:
                 print("Ошибка: " + message + " Код ответа: " + str(code) + ".")
                 return False
 
-        @staticmethod # АТАТА, СДЕЛАТЬ
+        @staticmethod
         def quit(command_connection):
             command_connection.send_cmd("QUIT")
 
@@ -262,10 +259,18 @@ class FTPCore:
                 split_message = message.split(",")
                 ip_address = "{}.{}.{}.{}".format(split_message[0], split_message[1], split_message[2], split_message[3])
                 port = 256 * int(split_message[4]) + int(split_message[5])
+                FTPCore.data_connection_type = FTPCore.DATA_PASSIVE
+                print("")
                 return True, ip_address, port
             else:
                 print("Ошибка: " + message + " Код ответа: " + str(code) + ".")
                 return False, '', 0
+
+        @staticmethod
+        def port(command_connection):
+            command_connection.send_cmd("PORT")
+            code, message = command_connection.get_reply()
+            print(code, message)
 
         @staticmethod
         def get_file(command_connection, file_name):
@@ -273,18 +278,28 @@ class FTPCore:
             data_connection.make_connection(command_connection)
             command_connection.send_cmd("RETR " + file_name)
             code, message = command_connection.get_reply()
-            print(code, message)
+            if code == 150:
+                current_bytes = 0
+                number_of_bytes = int(message[message.find("(") + 1:message.rfind(" ")])
+                file = open(file_name , "wb")
+                for data in data_connection.get_data(current_bytes, number_of_bytes):
+                    file.write(data)
+                file.close()
+                trans_stat_сode, message = command_connection.get_reply()
+                if trans_stat_сode == 226:
+                    print(message)
+                    data_connection.close_connection()
+                    return True
+            print("Ошибка: " + message + " Код ответа: " + str(code) + ".")
+            data_connection.close_connection()
+            return False
+
 
         @staticmethod
         def send_file(command_connection, file_name):
             command_connection.send_cmd("STOR " + file_name)
             code, message = command_connection.get_reply()
             print(code, message)
-
-
-
-
-
 
         # PASV (переход в пассивный режим, для установки соединения данных)
         # PORT (переход в активный режим, для установки соединения данных)

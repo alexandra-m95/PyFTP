@@ -67,15 +67,21 @@ class FTPTest(unittest.TestCase):
         print("%20s:\t" % "MDTM", end="")
         self.assertTrue(FTPTest.FTPCoreInstance.Commands.mdtm(FTPTest.FTPCoreInstance.comm_connection, "sasha"))
 
-   # def test14_pasv(self):
-   #     print("%20s:\t" % "PASV", end="")
-   #     self.assertTrue(FTPTest.FTPCoreInstance.Commands.pasv(FTPTest.FTPCoreInstance.comm_connection))
+    def test14_pasv(self):
+        print("%20s:\t" % "PASV", end="")
+        self.assertTrue(FTPTest.FTPCoreInstance.Commands.pasv(FTPTest.FTPCoreInstance.comm_connection))
 
     def test15_retr(self):
         print("%20s:\t" % "RETR", end="")
         self.assertTrue(FTPTest.FTPCoreInstance.Commands.get_file(FTPTest.FTPCoreInstance.comm_connection, "sasha"))
 
-  #  def test16_stor(self):
+    def test16_port(self):
+        print("%20s:\t" % "PORT", end="")
+        self.assertTrue(FTPTest.FTPCoreInstance.Commands.port(FTPTest.FTPCoreInstance.comm_connection))
+
+
+
+  #  def test17_stor(self):
   #      print("%20s:\t" % "STOR", end="")
   #      self.assertTrue(FTPTest.FTPCoreInstance.Commands.send_file(FTPTest.FTPCoreInstance.comm_connection, "olol"))
 
