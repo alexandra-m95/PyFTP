@@ -5,6 +5,7 @@ import chardet
 import sys
 import getpass
 import traceback
+import os
 
 
 class FTPCore:
@@ -14,7 +15,7 @@ class FTPCore:
     data_connection_type = None
 
     def __init__(self, serv_address, port=21, data_con_type=DATA_PASSIVE):
-        FTPCore.data_connetion_type = data_con_type
+        FTPCore.data_connection_type = data_con_type
         self.comm_connection = self.CommandConnection(serv_address, port, data_con_type)
 
     class CommandConnection:
@@ -60,33 +61,46 @@ class FTPCore:
             return code, message
 
     class DataConnection:
-
         def __init__(self):
             pass
 
         def make_connection(self, command_connection):
             if FTPCore.data_connection_type == FTPCore.DATA_PASSIVE:
-                result, ip_address, port = FTPCore.Commands.pasv(command_connection)
-                if result:
+                pasv_success, ip_address, port = FTPCore.Commands.pasv(command_connection)
+                if pasv_success:
                     self.data_sock = socket.socket()
                     self.data_sock.connect((ip_address, port))
+                    return True
                 else:
                     print("Соединение невозможно.")
-                return self
+                    return False
             elif FTPCore.data_connection_type == FTPCore.DATA_ACTIVE:
-                pass
+                self.data_sock = socket.socket()
+                self.data_sock.bind(("", 0))
+                host = self.data_sock.getsockname()[0]
+                port = self.data_sock.getsockname()[1]
+                port_success = FTPCore.Commands.port(command_connection, host, port)
+                if port_success:
+                    # Принимаем соединение с сервера
+                    # data_sock закрываем и подменяем ссылку на принятый con
+                    pass
+                    return True
+                else:
+                    return False
 
         def close_connection(self):
             self.data_sock.close()
 
-        def send_data(self):
-            pass
+        def send_data(self, data):
+            self.data_sock.sendall(data)
 
-        def get_data(self, current_number_of_bytes, number_of_bytes):
-            while current_number_of_bytes < number_of_bytes:
+        def get_data(self):
+            while True:
                 data = self.data_sock.recv(1024)
-                yield data
-                current_number_of_bytes += 1024
+                if not data == b"":
+                    yield data
+                else:
+                    break
 
     class Commands:
         """
@@ -147,6 +161,13 @@ class FTPCore:
         @staticmethod
         def quit(command_connection):
             command_connection.send_cmd("QUIT")
+            code, message = command_connection.get_reply()
+            if code == 221:
+                print(message)
+                return True
+            else:
+                print("Ошибка: " + message + " Код ответа: " + str(code) + ".")
+                return False
 
         @staticmethod
         def noop(command_connection):
@@ -259,31 +280,45 @@ class FTPCore:
                 split_message = message.split(",")
                 ip_address = "{}.{}.{}.{}".format(split_message[0], split_message[1], split_message[2], split_message[3])
                 port = 256 * int(split_message[4]) + int(split_message[5])
-                FTPCore.data_connection_type = FTPCore.DATA_PASSIVE
-                print("")
                 return True, ip_address, port
             else:
                 print("Ошибка: " + message + " Код ответа: " + str(code) + ".")
                 return False, '', 0
 
         @staticmethod
-        def port(command_connection):
-            command_connection.send_cmd("PORT")
+        def port(command_connection, host, port):
+            a1a2a3a4 = host.split(".")
+            p5 = port >> 8
+            p6 = port - (p5 << 8)
+            port_args = a1a2a3a4 + [str(p5), str(p6)]
+            print("PORT " + ",".join(port_args))
+            command_connection.send_cmd("PORT " + ",".join(port_args))
             code, message = command_connection.get_reply()
-            print(code, message)
+            if code == 200:
+                return True
+            elif port == 500:
+                print("Ошибка: " + message + " Код ответа: " + str(code) + ".")
+                print("Подключитесь в пассивном режиме")
+                return False
+            else:
+                return False
 
         @staticmethod
         def get_file(command_connection, file_name):
             data_connection = FTPCore.DataConnection()
-            data_connection.make_connection(command_connection)
+            make_con_success = data_connection.make_connection(command_connection)
+            if not make_con_success:
+                print("Извините, не удаётся установить соединение данных.")
+                return False
             command_connection.send_cmd("RETR " + file_name)
             code, message = command_connection.get_reply()
             if code == 150:
                 current_bytes = 0
                 number_of_bytes = int(message[message.find("(") + 1:message.rfind(" ")])
                 file = open(file_name , "wb")
-                for data in data_connection.get_data(current_bytes, number_of_bytes):
+                for data in data_connection.get_data():
                     file.write(data)
+                    current_bytes += len(data)  # for progressbar
                 file.close()
                 trans_stat_сode, message = command_connection.get_reply()
                 if trans_stat_сode == 226:
@@ -294,18 +329,70 @@ class FTPCore:
             data_connection.close_connection()
             return False
 
-
         @staticmethod
         def send_file(command_connection, file_name):
+            if not os.path.exists(file_name):
+                print("File not found!")
+                return False
+            data_connection = FTPCore.DataConnection()
+            make_con_success = data_connection.make_connection(command_connection)
+            if not make_con_success:
+                print("Извините, не удаётся установить соединение данных.")
+                return False
             command_connection.send_cmd("STOR " + file_name)
             code, message = command_connection.get_reply()
-            print(code, message)
+            if code == 150:
+                current_bytes = 0
+                file_size = os.path.getsize(file_name)
+                file = open(file_name, "rb")
+                while current_bytes < file_size:
+                    data = file.read(1024)
+                    data_connection.send_data(data)
+                    current_bytes += 1024
+                file.close()
+                data_connection.close_connection()
+                code, message = command_connection.get_reply()
+                if code == 226:
+                    print("File is upload")
+                    return True
+            data_connection.close_connection()
+            print("Ошибка: " + message + " Код ответа: " + str(code) + ".")
+            return False
 
-        # PASV (переход в пассивный режим, для установки соединения данных)
-        # PORT (переход в активный режим, для установки соединения данных)
-        # RETR (скачать файл с сервера)
-        # STOR (закачать файл на сервер)
-        # LIST
+        @staticmethod
+        def ls(command_connection, folder=""):
+            data_connection = FTPCore.DataConnection()
+            make_con_success = data_connection.make_connection(command_connection)
+            if not make_con_success:
+                print("Извините, не удаётся установить соединение данных.")
+                return False
+            command_connection.send_cmd("LIST " + folder)
+            code, message = command_connection.get_reply()
+            if code == 150:
+                current_bytes = 0
+                folder_content = bytearray()
+                for data in data_connection.get_data():
+                    folder_content += data
+                    current_bytes += len(folder_content)
+                folder_content = folder_content.decode()
+                print(folder_content)
+                trans_stat_сode, message = command_connection.get_reply()
+                if trans_stat_сode == 226:
+                    print(message)
+                    data_connection.close_connection()
+                    return True
+            print("Ошибка: " + message + " Код ответа: " + str(code) + ".")
+            data_connection.close_connection()
+            return False
+
+# Залить на гитхаб
+# Progress bar
+# Shell
+# Привести все выводы к единому виду
+# Почистить код
+# Keep alive
+# Забанить google translate
+
 
 
 
