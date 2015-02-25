@@ -25,7 +25,7 @@ class FTPTest(unittest.TestCase):
     def test03_login(self):
         print("%20s:\t" % "USER+PASS", end="")
         self.assertTrue(FTPTest.FTPCoreInstance.Commands.login(FTPTest.FTPCoreInstance.comm_connection,
-                                                                "alexandra", "penguin123"))
+                                                                "alexandra", "penguin123", True))
 
     def test04_noop_after(self):
         print("%20s:\t" % "NOOP", end="")
@@ -48,9 +48,6 @@ class FTPTest(unittest.TestCase):
         print("%20s:\t" % "RMD", end="")
         self.assertTrue(FTPTest.FTPCoreInstance.Commands.rmdir(FTPTest.FTPCoreInstance.comm_connection, "penguin"))
 
-    def jffghtest09_rm(self):                               # сделать после закачивания файла
-        print("%20s:\t" % "DELE", end="")
-        self.assertTrue(FTPTest.FTPCoreInstance.Commands.rm(FTPTest.FTPCoreInstance.comm_connection, "lol"))
 
     def test10_cd(self):
         print("%20s:\t" % "CD", end="")
@@ -68,44 +65,36 @@ class FTPTest(unittest.TestCase):
         print("%20s:\t" % "MDTM", end="")
         self.assertTrue(FTPTest.FTPCoreInstance.Commands.mdtm(FTPTest.FTPCoreInstance.comm_connection, "sasha"))
 
-    def test15_retr(self):
-        print("%20s:\t" % "RETR", end="")
-        self.assertTrue(FTPTest.FTPCoreInstance.Commands.get_file(FTPTest.FTPCoreInstance.comm_connection, "sasha"))
-        os.remove("sasha")
-
     def test16_noop_after_data_con(self):
         print("%20s:\t" % "NOOP", end="")
         self.assertTrue(FTPTest.FTPCoreInstance.Commands.noop(FTPTest.FTPCoreInstance.comm_connection))
 
-    # def test17_retr(self):
-    #   print("%20s:\t" % "RETR", end="")
-    #    FTPCore.data_connection_type = FTPCore.DATA_ACTIVE
-    #    self.assertTrue(FTPTest.FTPCoreInstance.Commands.get_file(FTPTest.FTPCoreInstance.comm_connection, "sasha"))
-
     def test17_stor(self):
         print("%20s:\t" % "STOR", end="")
-        self.assertTrue(FTPTest.FTPCoreInstance.Commands.send_file(FTPTest.FTPCoreInstance.comm_connection, "LICENCE"))
+        self.assertTrue(FTPTest.FTPCoreInstance.Commands.send_file(FTPTest.FTPCoreInstance.comm_connection, "Test/7777log"))
 
-    def test18_list_1(self):
+    def test18_retr(self):
+        print("%20s:\t" % "RETR", end="")
+        self.assertTrue(FTPTest.FTPCoreInstance.Commands.get_file(FTPTest.FTPCoreInstance.comm_connection, "7777log"))
+        os.remove("7777log")
+
+    def test19_rm(self):                               # сделать после закачивания файла
+        print("%20s:\t" % "DELE", end="")
+        self.assertTrue(FTPTest.FTPCoreInstance.Commands.rm(FTPTest.FTPCoreInstance.comm_connection, "7777log"))
+
+    def test20_list_1(self):
         print("%20s:\t" % "LIST", end="")
         self.assertTrue(FTPTest.FTPCoreInstance.Commands.ls(FTPTest.FTPCoreInstance.comm_connection))
 
-    def test18_list_2(self):
+    def test21_list_2(self):
         print("%20s:\t" % "LIST", end="")
         self.assertTrue(FTPTest.FTPCoreInstance.Commands.ls(FTPTest.FTPCoreInstance.comm_connection, "folder1"))
 
-    def test19_quit(self):
+    def test22_quit(self):
         print("%20s:\t" % "QUIT", end="")
         self.assertTrue(FTPTest.FTPCoreInstance.Commands.quit(FTPTest.FTPCoreInstance.comm_connection))
 
-    def test20_connection(self):
+    def test23_connection(self):
         print("%20s:\t" % "Установка соединения", end="")
         FTPTest.FTPCoreInstance = FTPCore("127.0.0.0")
         self.assertFalse(FTPTest.FTPCoreInstance.comm_connection.make_connection())
-
-
-
-
-
-
-
